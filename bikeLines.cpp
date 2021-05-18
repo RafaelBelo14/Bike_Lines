@@ -1,166 +1,243 @@
-// C++ program for Kruskal's algorithm to find Minimum
-// Spanning Tree of a given connected, undirected and
-// weighted graph
 #include <iostream>
 #include <vector>
 #include <string>
 #include <utility>
+#include <algorithm>
 #include <stack>
 #include <list>
-#define NIL -1
 using namespace std;
+typedef  pair<int, int> arc;
 
-#define edge pair<int, int>
-
-stack<int> S;
-stack<int> C;
-stack<stack<int> >Scc;
-int numOfCircuits = 0;
-
-class Graph
+struct Edge
 {
-private:
-      vector< pair<int, edge> > G;
-      vector< pair<int, edge> > T;
-      int *parent;
-      int V;
-public:
-      Graph(int V);
-      void AddWeightedEdge(int u, int v, int w);
-      int find_set(int i);
-      void union_set(int u, int v);
-      void kruskal();
-      void printTotalWeight();
-      void SCCUtil(int u, int disc[], int low[], bool stackMember[]);
-      void SCC();
+      int peso;
+      arc pontos;
 };
 
-Graph::Graph(int V)
+struct subsets
 {
-      this->V = V;
-      parent = new int[V];
+      int parent;
+      int rank;
+};
 
-      for (int i = 1; i <= V; i++)
-            parent[i] = i;
 
-      G.clear();
-      T.clear();
-}
-void Graph::AddWeightedEdge(int u, int v, int w)
+struct less_than_int
 {
-      G.push_back(make_pair(w, edge(u, v)));
-}
-int Graph::find_set(int i)
+    inline bool operator() (const Edge& struct1, const Edge& struct2)
+    {
+        return (struct1.peso < struct2.peso);
+    }
+};
+
+vector<Edge> kruskalAux;
+vector<int> S;
+
+vector<vector<int> > C;
+
+int numCircuits;
+int tamMaiorCircuit;
+int custoMaiorCircuit;
+int custoTotal;
+
+vector<vector<int> > matriz;
+vector<vector<int> > test;
+
+void Tarjan(int V, int u, int dfs[], int low[], bool auxMember[], vector<vector<int> > matriz);
+void intoTarjan(int V, vector<vector<int> > matriz);
+void setEdges(vector<vector<int> > C, vector<vector<int> > matriz);
+void answerQuestions(int q);
+int kruskalMST(int V);
+void union1(struct subsets sub[], int i, int j);
+int find(struct subsets sub[], int i);
+
+
+int find(struct subsets sub[], int i)
 {
-      if (i == parent[i])
-            return i;
+      if (sub[i].parent != i)
+          sub[i].parent = find(sub, sub[i].parent);
+      return sub[i].parent;
+}
+
+void union1(struct subsets sub[], int i, int j)
+{
+      int a = find(sub, i);
+      int b = find(sub, j);
+      if (sub[a].rank > sub[b].rank)
+        sub[b].parent = a;
       else
-            return find_set(parent[i]);
+        sub[a].parent = b;
+      if (sub[a].rank == sub[b].rank)
+        sub[b].rank++;
 }
 
-void Graph::union_set(int u, int v)
+int kruskalMST(int V)
 {
-      parent[u] = parent[v];
-}
-void Graph::kruskal()
-{
-      int i, uRep, vRep;
-      sort(G.begin(), G.end());
+      int mincost = 0;
 
-      for (i = 0; i < G.size(); i++)
+      struct subsets sub[V];
+
+      for (int i = 0; i < V; i++)
       {
-            uRep = find_set(G[i].second.first);
-            vRep = find_set(G[i].second.second);
-            if (uRep != vRep)
+            sub[i].parent = i;
+            sub[i].rank = 0;
+      }
+      sort(kruskalAux.begin(), kruskalAux.end(), less_than_int());
+      for (int i = 0; i < (int)kruskalAux.size(); i++)
+      {
+            int u = kruskalAux[i].pontos.first;
+            int v = kruskalAux[i].pontos.second;
+
+            int set_u = find(sub,u);
+            int set_v = find(sub, v);
+
+            if (set_u != set_v)
             {
-                  T.push_back(G[i]);
-                  union_set(uRep, vRep);
+                  mincost += kruskalAux[i].peso;
+                  union1(sub, set_u, set_v);
             }
       }
+      return mincost;
 }
 
-void Graph::SCCUtil(int v, int disc[], int low[], bool stackMember[])
+void Tarjan(int V, int v, int dfs[], int low[], bool auxMember[], vector<vector<int> > matriz)
 {
-      static int time = 0;
+      static int t = 0;
+      int aux = 0;
 
-      disc[v] = low[v] = ++time;
-      S.push(v);
-      stackMember[v] = true;
+      dfs[v] = low[v] = ++t;
+      S.push_back(v);
+      auxMember[v] = true;
 
-      vector< pair<int, edge> >::iterator i;
-      for (i = G.begin(); i != G.end(); ++i)
+      for (int w = 0; w < V; w++)
       {
-            int w = i->second.second;
-
-            if (disc[w] == -1)
+            if (matriz[v][w])
             {
-                  SCCUtil(w, disc, low, stackMember);
-                  low[v] = min(low[v], low[w]);
-            }
+                  if (dfs[w] == -1)
+                  {
+                        Tarjan(V, w, dfs, low, auxMember, matriz);
+                        low[v] = min(low[v], low[w]);
+                  }
 
-            else if (stackMember[w] == true)
-                  low[v] = min(low[v], disc[w]);
+                  else if (auxMember[w])
+                  {
+                        low[v] = min(low[v], dfs[w]);
+                  }
+            }
       }
 
-      int w = 0; 
-      if (low[v] == disc[v])
+      int popItem = 0;
+      if (low[v] == dfs[v])
       {
-            numOfCircuits++;
-
-             while (S.top() != v) {
-                  w = S.top();
-                  stackMember[w] = false;
-                  S.pop();
-                  C.push(w);
+            vector<int> row;
+            while (S.back() != v)
+            {
+                  popItem = S.back();
+                  auxMember[popItem] = false;
+                  S.pop_back();
+                  aux++;
+                  row.push_back(popItem);
             }
-            
-            w = S.top();
-            stackMember[w] = false;
-            S.pop();
-            Scc.push(C);
+
+            popItem = S.back();
+            row.push_back(popItem);
+            auxMember[popItem] = false;
+            S.pop_back();
+
+            if (row.size() > 1)
+            {
+                  aux++;
+                  numCircuits++;
+            }
+
+            if (aux > tamMaiorCircuit)
+            {
+                  tamMaiorCircuit = aux;
+            }
+
+            if (row.size() > 1) {
+                  C.push_back(row);
+            }
       }
 }
 
-void Graph::SCC()
+void intoTarjan(int V, vector<vector<int> > matriz)
 {
-      int *disc = new int[V];
-      int *low = new int[V];
-      bool *stackMember = new bool[V];
+      int dfs[V];
+      int low[V];
+      bool auxMember[V];
+      numCircuits = 0;
+      tamMaiorCircuit = 0;
+      custoMaiorCircuit = 0;
+      custoTotal = 0;
 
-      while (!S.empty()) {
-            S.pop();
-      }
-      while (!C.empty()) {
-            C.pop();
-      }
-      while (!Scc.empty()) {
-            Scc.pop();
+      S.clear();
+
+      for (int i = 0; i < V; i++)
+      {
+            dfs[i] = low[i] = -1;
+            auxMember[i] = false;
       }
 
       for (int i = 0; i < V; i++)
       {
-            disc[i] = NIL;
-            low[i] = NIL;
-            stackMember[i] = false;
-      }
 
-      for (int i = 0; i < V; i++) {
-            if (disc[i] == NIL) {
-                   SCCUtil(i, disc, low, stackMember);
-            }          
+            if (dfs[i] == -1)
+            {
+                  Tarjan(V, i, dfs, low, auxMember, matriz);
+            }
       }
-            
 }
 
-void Graph::printTotalWeight()
+void answerQuestions(int q)
 {
 
-      int weight = 0;
-      for (int i = 0; i < T.size(); i++)
+      vector<int> answer;
+
+      if (q == 1)
       {
-            weight += T[i].first;
+            answer.push_back(numCircuits);
       }
-      cout << weight << endl;
+      else if (q == 2)
+      {
+            answer.push_back(numCircuits);
+            answer.push_back(tamMaiorCircuit);
+      }
+      else if (q == 3)
+      {
+
+            answer.push_back(numCircuits);
+            answer.push_back(tamMaiorCircuit);
+            answer.push_back(custoMaiorCircuit);
+      }
+      else if (q == 4)
+      {
+            answer.push_back(numCircuits);
+            answer.push_back(tamMaiorCircuit);
+            answer.push_back(custoMaiorCircuit);
+            answer.push_back(custoTotal);
+      }
+
+      test.push_back(answer);
+}
+
+void setEdges(int indice, vector<vector<int> > C, vector<vector<int> > matriz)
+{
+      Edge e;
+
+      for (int i = 0; i < (int)C[indice].size(); i++)
+      {
+
+            for (int j = 0; j < (int)C[indice].size(); j++)
+            {
+                  if (i != j && matriz[C[indice][i]][C[indice][j]] != 0)
+                  {
+                        e.pontos.first = i;
+                        e.pontos.second = j;
+                        e.peso = matriz[C[indice][i]][C[indice][j]];
+                        kruskalAux.push_back(e);
+                  }
+            }
+      }
 }
 
 int main()
@@ -174,9 +251,10 @@ int main()
             cin >> n;
             cin >> m;
             cin >> q;
-
-            int aux = 0;
-            int bestCircuit = 0;
+            numCircuits = 0;
+            tamMaiorCircuit = 0;
+            custoMaiorCircuit = 0;
+            custoTotal = 0;
 
             // VERIFICA CONDIÇÕES INICIAIS
             if (n > 1000 || n <= 0 || m > 100000 || m <= 0 || q > 4 || q <= 0)
@@ -184,36 +262,44 @@ int main()
                   return 0;
             }
 
-            Graph g(n);
+            for (int i = 0; i < n; i++)
+            {
+                  vector<int> row(n, 0);
+                  matriz.push_back(row);
+            }
 
             for (int i = 0; i < m; i++)
             {
                   cin >> A;
                   cin >> B;
                   cin >> D;
-                  g.AddWeightedEdge(A, B, D);
+                  matriz[A - 1][B - 1] = D;
             }
+            intoTarjan(n, matriz);
 
-            g.SCC();
-
-            cout << Scc.size() << " ";
-
-            while (!Scc.empty())
+            int auxCusto;
+            for (int i = 0; i < (int)C.size(); i++)
             {
-                  while (!Scc.top().empty()) {
-                        Scc.top().pop();
-                        aux++;
+                  setEdges(i, C, matriz);
+                  auxCusto = kruskalMST((int)C[i].size());
+                  if (auxCusto > custoMaiorCircuit) {
+                        custoMaiorCircuit = auxCusto;
                   }
-                  Scc.pop();
-                  if (aux > bestCircuit) {
-                        bestCircuit = aux;
-                  }
-                  aux = 0;
+                  custoTotal += auxCusto;
+                  kruskalAux.clear();
             }
 
-            cout << bestCircuit << " ";
-            
-            g.kruskal();
-            g.printTotalWeight();
+            answerQuestions(q);
+            matriz.clear();
+            C.clear();
+      }
+
+      for (auto i = test.begin(); i != test.end(); ++i)
+      {
+            for (auto j = i->begin(); j != i->end(); ++j)
+            {
+                  cout << *j << " ";
+            }
+            cout << endl;
       }
 }
